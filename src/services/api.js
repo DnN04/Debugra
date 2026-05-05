@@ -2,13 +2,33 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// ─── Axios Instance ────────────────────────────────────────────────────────────
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Execute code via Judge0
+// Request interceptor — attach any future auth tokens here
+api.interceptors.request.use(
+  (config) => config,
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor — normalize errors into a consistent shape
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const message =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      'An unexpected error occurred';
+    return Promise.reject(new Error(message));
+  }
+);
+
+// ─── Code Execution ────────────────────────────────────────────────────────────
 export const executeCode = async (sourceCode, languageId, stdin = '') => {
   const { data } = await api.post('/api/execute', {
     source_code: sourceCode,
@@ -18,32 +38,28 @@ export const executeCode = async (sourceCode, languageId, stdin = '') => {
   return data;
 };
 
-// AI: Explain error
-export const explainError = async (code, error, language) => {
+// ─── AI Features ──────────────────────────────────────────────────────────────
+export const aiExplainError = async (code, error, language) => {
   const { data } = await api.post('/api/ai/explain-error', { code, error, language });
   return data;
 };
 
-// AI: Fix code
-export const fixCode = async (code, error, language) => {
+export const aiFixCode = async (code, error, language) => {
   const { data } = await api.post('/api/ai/fix-code', { code, error, language });
   return data;
 };
 
-// AI: Explain logic
-export const explainLogic = async (code, language) => {
+export const aiExplainLogic = async (code, language) => {
   const { data } = await api.post('/api/ai/explain-logic', { code, language });
   return data;
 };
 
-// AI: Generate test cases
-export const generateTestCases = async (code, language) => {
+export const aiGenerateTests = async (code, language) => {
   const { data } = await api.post('/api/ai/generate-tests', { code, language });
   return data;
 };
 
-// AI: Visualize execution
-export const visualizeExecution = async (code, language, input = '') => {
+export const aiVisualizeExecution = async (code, language, input = '') => {
   const { data } = await api.post('/api/ai/visualize', { code, language, input });
   return data;
 };

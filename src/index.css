@@ -83,6 +83,48 @@ body {
 }
 .topbar-link:hover { color: var(--text-0); border-color: var(--accent); background: rgba(0,120,212,0.08); box-shadow: 0 1px 4px rgba(0,120,212,0.15); }
 
+/* Topbar inline room ID input */
+.topbar-input {
+  background: var(--bg-2); border: 1px solid var(--border); color: var(--text-0);
+  border-radius: 4px; padding: 3px 8px; font-size: 0.7rem; width: 80px; outline: none;
+  font-family: 'Inter', sans-serif;
+}
+.topbar-input:focus { border-color: var(--accent); }
+
+/* User avatar circle */
+.user-avatar {
+  width: 22px; height: 22px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 0.6rem;
+  font-weight: 700; background: var(--accent); color: white; flex-shrink: 0;
+}
+
+/* Read-only badge overlay on Monaco */
+.readonly-badge {
+  position: absolute; top: 10px; right: 20px; z-index: 10;
+  background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px;
+  color: #ccc; font-size: 0.7rem; display: flex; align-items: center;
+  gap: 4px; pointer-events: none; border: 1px solid rgba(255,255,255,0.1);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Stdin panel toggle button */
+.stdin-toggle-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; background: none; border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 600;
+  transition: color 0.2s;
+}
+
+/* Animated pulse dot inside stdin panel */
+.stdin-pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #dcdcaa;
+  box-shadow: 0 0 6px rgba(220,220,170,0.6);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+
+
 /* ============ TOOLBAR ============ */
 .toolbar {
   height: 40px;

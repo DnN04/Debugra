@@ -1,0 +1,188 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  doc, setDoc, updateDoc, onSnapshot, serverTimestamp, getDoc,
+} from 'firebase/firestore';
+import { db } from '../services/firebase';
+import toast from 'react-hot-toast';
+
+/**
+ * useRoom
+ * Manages all Firebase Firestore room state:
+ *   - Creating and joining rooms
+ *   - Real-time code/language sync
+ *   - Access control (request, approve, deny, revoke, take/release)
+ *   - Active user presence list
+ *
+ * @param {{ uid, displayName, email }} user - the current Firebase user
+ * @param {string} code - current editor code (for syncing)
+ * @param {string} language - current editor language
+ * @param {string} stdinValue - current stdin value
+ * @param {Function} setCode - to apply remote code changes
+ * @param {Function} setLanguage - to apply remote language changes
+ * @param {Function} setStdinValue - to apply remote stdin changes
+ */
+export function useRoom({ user, code, language, stdinValue, setCode, setLanguage, setStdinValue }) {
+  const [roomId, setRoomId] = useState(null);
+  const [roomData, setRoomData] = useState(null);
+  const [activeUsers, setActiveUsers] = useState([]);
+  const [showOnlineDropdown, setShowOnlineDropdown] = useState(false);
+  const [showRequestsDropdown, setShowRequestsDropdown] = useState(false);
+
+  // ─── Derived permissions ────────────────────────────────────────────────────
+  const isAuthor = roomData?.createdBy === user?.uid;
+  const isAllowedEditor = roomData?.allowedEditors?.includes(user?.uid);
+  const isCurrentEditor = roomData?.currentEditor === user?.uid;
+  const isReadOnly = roomId ? !isCurrentEditor : false;
+  const currentEditorName =
+    activeUsers.find((u) => u.uid === roomData?.currentEditor)?.displayName || 'None';
+
+  // ─── Live sync from Firestore ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!roomId) return;
+    const unsub = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setRoomData(data);
+      if (data.code !== undefined && data._lastEditor !== user?.uid) setCode(data.code);
+      if (data.language) setLanguage(data.language);
+      if (data.stdin !== undefined && data._lastEditor !== user?.uid) setStdinValue(data.stdin);
+      setActiveUsers(data.activeUsers || []);
+    });
+    return unsub;
+  }, [roomId, user]);
+
+  // ─── Push local changes (debounced, author-gated) ──────────────────────────
+  useEffect(() => {
+    if (!roomId || !user || !roomData) return;
+    if (roomData.currentEditor !== user.uid) return;
+    const timer = setTimeout(() => {
+      updateDoc(doc(db, 'rooms', roomId), {
+        code, language, stdin: stdinValue,
+        _lastEditor: user.uid,
+        updatedAt: serverTimestamp(),
+      }).catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [code, language, stdinValue, roomId, user, roomData?.currentEditor]);
+
+  // ─── Create room ────────────────────────────────────────────────────────────
+  const createRoom = useCallback(async () => {
+    if (!user) return false; // let caller show auth modal
+    const id = crypto.randomUUID().slice(0, 8);
+    const displayName = user.displayName || user.email?.split('@')[0] || 'Guest';
+    await setDoc(doc(db, 'rooms', id), {
+      name: `Room ${id}`,
+      createdBy: user.uid,
+      code,
+      language,
+      activeUsers: [{ uid: user.uid, displayName }],
+      allowedEditors: [user.uid],
+      currentEditor: user.uid,
+      editRequests: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    setRoomId(id);
+    toast.success(`Room created! ID: ${id}`);
+    navigator.clipboard.writeText(id);
+    return true;
+  }, [user, code, language]);
+
+  // ─── Join room ──────────────────────────────────────────────────────────────
+  const joinRoom = useCallback(async (joinId) => {
+    if (!user || !joinId.trim()) return false;
+    const newRoomId = joinId.trim();
+    try {
+      const roomRef = doc(db, 'rooms', newRoomId);
+      const roomSnap = await getDoc(roomRef);
+      if (!roomSnap.exists()) { toast.error('Room not found'); return false; }
+      const currentUsers = roomSnap.data().activeUsers || [];
+      const displayName = user.displayName || user.email?.split('@')[0] || 'Guest';
+      if (!currentUsers.some((u) => u.uid === user.uid)) {
+        await updateDoc(roomRef, {
+          activeUsers: [...currentUsers, { uid: user.uid, displayName }],
+        });
+      }
+      setRoomId(newRoomId);
+      toast.success(`Joined room: ${newRoomId}`);
+      return true;
+    } catch {
+      toast.error('Failed to join room');
+      return false;
+    }
+  }, [user]);
+
+  // ─── Access control ─────────────────────────────────────────────────────────
+  const requestAccess = useCallback(async () => {
+    if (!user || !roomId || !roomData) return;
+    if (roomData.editRequests?.some((r) => r.uid === user.uid)) {
+      toast.error('Access request already sent.');
+      return;
+    }
+    const newRequests = [
+      ...(roomData.editRequests || []),
+      { uid: user.uid, displayName: user.displayName },
+    ];
+    await updateDoc(doc(db, 'rooms', roomId), { editRequests: newRequests });
+    toast.success('Requested edit access from the author.');
+  }, [user, roomId, roomData]);
+
+  const approveAccess = useCallback(async (requestUid) => {
+    if (!roomId || !roomData || !isAuthor) return;
+    const newAllowed = [...new Set([...(roomData.allowedEditors || []), requestUid])];
+    const newRequests = (roomData.editRequests || []).filter((r) => r.uid !== requestUid);
+    await updateDoc(doc(db, 'rooms', roomId), { allowedEditors: newAllowed, editRequests: newRequests });
+    toast.success('Access granted.');
+  }, [roomId, roomData, isAuthor]);
+
+  const denyAccess = useCallback(async (requestUid) => {
+    if (!roomId || !roomData || !isAuthor) return;
+    const newRequests = (roomData.editRequests || []).filter((r) => r.uid !== requestUid);
+    await updateDoc(doc(db, 'rooms', roomId), { editRequests: newRequests });
+    toast('Access denied.');
+  }, [roomId, roomData, isAuthor]);
+
+  const revokeAccess = useCallback(async (revokeUid) => {
+    if (!roomId || !roomData || !isAuthor) return;
+    const newAllowed = (roomData.allowedEditors || []).filter((uid) => uid !== revokeUid);
+    const updates = { allowedEditors: newAllowed };
+    if (roomData.currentEditor === revokeUid) updates.currentEditor = null;
+    await updateDoc(doc(db, 'rooms', roomId), updates);
+    toast('Access revoked.');
+  }, [roomId, roomData, isAuthor]);
+
+  const takeControl = useCallback(async () => {
+    if (!user || !roomId || !isAllowedEditor) return;
+    await updateDoc(doc(db, 'rooms', roomId), { currentEditor: user.uid });
+    toast.success('You are now editing.');
+  }, [user, roomId, isAllowedEditor]);
+
+  const releaseControl = useCallback(async () => {
+    if (!user || !roomId || !isCurrentEditor) return;
+    await updateDoc(doc(db, 'rooms', roomId), { currentEditor: null });
+    toast.success('You released the editor lock.');
+  }, [user, roomId, isCurrentEditor]);
+
+  return {
+    roomId,
+    roomData,
+    activeUsers,
+    showOnlineDropdown,
+    setShowOnlineDropdown,
+    showRequestsDropdown,
+    setShowRequestsDropdown,
+    isAuthor,
+    isAllowedEditor,
+    isCurrentEditor,
+    isReadOnly,
+    currentEditorName,
+    createRoom,
+    joinRoom,
+    requestAccess,
+    approveAccess,
+    denyAccess,
+    revokeAccess,
+    takeControl,
+    releaseControl,
+  };
+}
