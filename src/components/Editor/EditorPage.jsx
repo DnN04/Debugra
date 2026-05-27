@@ -28,6 +28,7 @@ import CollaborationControls from './CollaborationControls';
 import EditorStatusBar from './EditorStatusBar';
 import MobileBottomNav from './MobileBottomNav';
 import VideoCall from './VideoCall';
+import VotePopup from './VotePopup';
 import { getSessionApiKey, isSecureApiKeyStored } from '../../services/secureApiKeyStore';
 
 function getApiKeyStatus() {
@@ -88,6 +89,8 @@ export default function EditorPage({ user }) {
     isMobile,
     setMobileTab,
     audioFeedback,
+    user,
+    room,
   });
 
   const executionRunRef = useRef(execution.run);
@@ -1047,6 +1050,9 @@ export default function EditorPage({ user }) {
           onClose={() => setShowVideoCall(false)}
         />
       )}
+
+      {/* Real-time Democratic Vote Popup */}
+      <VotePopup room={room} user={user} />
     </div>
   );
 }

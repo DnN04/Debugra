@@ -289,6 +289,68 @@ export function useRoom({ user, code, language, stdinValue, setCode, setLanguage
     toast.success('Left the room');
   }, [roomId, user, roomData]);
 
+  // ─── Execution Voting & Results Sync ──────────────────────────────────────────
+  const startExecutionVote = useCallback(async (code, language, stdin) => {
+    if (!roomId || !user) return;
+    const activeVote = {
+      initiatorUid: user.uid,
+      initiatorName: user.displayName || 'Guest',
+      code,
+      language,
+      stdin,
+      approvals: [user.uid], // initiator pre-approves
+      rejections: [],
+      status: 'voting',
+      createdAt: new Date().toISOString(),
+    };
+    await updateDoc(doc(db, 'rooms', roomId), { activeVote });
+    toast.success('Started a vote for code execution!');
+  }, [roomId, user]);
+
+  const castVote = useCallback(async (voteType) => {
+    if (!roomId || !user || !roomData?.activeVote) return;
+    const activeVote = { ...roomData.activeVote };
+    const approvals = [...(activeVote.approvals || [])];
+    const rejections = [...(activeVote.rejections || [])];
+
+    if (voteType === 'approve') {
+      if (!approvals.includes(user.uid)) approvals.push(user.uid);
+      const rejIdx = rejections.indexOf(user.uid);
+      if (rejIdx > -1) rejections.splice(rejIdx, 1);
+    } else if (voteType === 'reject') {
+      if (!rejections.includes(user.uid)) rejections.push(user.uid);
+      const appIdx = approvals.indexOf(user.uid);
+      if (appIdx > -1) approvals.splice(appIdx, 1);
+    }
+
+    activeVote.approvals = approvals;
+    activeVote.rejections = rejections;
+
+    const totalUsersCount = activeUsers.length;
+    if (approvals.length > totalUsersCount / 2) {
+      activeVote.status = 'approved';
+    } else if (rejections.length >= totalUsersCount / 2) {
+      activeVote.status = 'rejected';
+    }
+
+    await updateDoc(doc(db, 'rooms', roomId), { activeVote });
+  }, [roomId, user, roomData?.activeVote, activeUsers]);
+
+  const clearVote = useCallback(async () => {
+    if (!roomId) return;
+    await updateDoc(doc(db, 'rooms', roomId), { activeVote: null });
+  }, [roomId]);
+
+  const syncExecutionResult = useCallback(async (result) => {
+    if (!roomId) return;
+    await updateDoc(doc(db, 'rooms', roomId), { executionResult: result });
+  }, [roomId]);
+
+  const clearExecutionResult = useCallback(async () => {
+    if (!roomId) return;
+    await updateDoc(doc(db, 'rooms', roomId), { executionResult: null });
+  }, [roomId]);
+
   return {
     roomId,
     roomData,
@@ -311,5 +373,11 @@ export function useRoom({ user, code, language, stdinValue, setCode, setLanguage
     takeControl,
     releaseControl,
     leaveRoom,
+    startExecutionVote,
+    castVote,
+    clearVote,
+    syncExecutionResult,
+    clearExecutionResult,
   };
 }
+
