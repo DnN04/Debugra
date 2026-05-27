@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
@@ -79,7 +79,6 @@ export default function EditorPage({ user }) {
     setStdinValue: editor.setStdinValue,
   });
 
-  // ─── Code Execution Logic ──────────────────────────────────────────────────
   const execution = useExecution({
     language: editor.language,
     code: editor.code,
@@ -88,6 +87,11 @@ export default function EditorPage({ user }) {
     setMobileTab,
     audioFeedback,
   });
+
+  const executionRunRef = useRef(execution.run);
+  useEffect(() => {
+    executionRunRef.current = execution.run;
+  }, [execution.run]);
 
   // ─── AI Logic ─────────────────────────────────────────────────────────────
   const ai = useAI({
@@ -163,7 +167,9 @@ export default function EditorPage({ user }) {
       editor.setCursorPos({ line: e.position.lineNumber, col: e.position.column });
     });
     // Ctrl+Enter → Run
-    editorInstance.addCommand(2048 | 3, () => execution.run());
+    editorInstance.addCommand(2048 | 3, () => {
+      if (executionRunRef.current) executionRunRef.current();
+    });
   };
 
   // ─── Output Pane Resize ───────────────────────────────────────────────────
@@ -848,8 +854,27 @@ export default function EditorPage({ user }) {
             <div
               className={`output-panel ${execution.activeOutputTab === OUTPUT_TABS.STDOUT ? 'active' : ''}`}
               id="output-stdout"
+              style={{ position: 'relative' }}
             >
-              {execution.stdout || (
+              {execution.stdout ? (
+                <>
+                  <button
+                    className="toolbar-icon-btn"
+                    style={{ position: 'absolute', top: '8px', right: '8px', background: 'var(--bg-1)', zIndex: 10 }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(execution.stdout);
+                      toast.success('Output copied!');
+                    }}
+                    title="Copy output"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                  {execution.stdout}
+                </>
+              ) : (
                 <span className="output-placeholder">Run your code to see output here.</span>
               )}
             </div>
