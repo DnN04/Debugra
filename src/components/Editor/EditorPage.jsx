@@ -41,6 +41,7 @@ import VotePopup from './VotePopup';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import { getSessionApiKey, isSecureApiKeyStored } from '../../services/secureApiKeyStore';
 import DebugOverlay from './DebugOverlay';
+import SearchReplacePanel from './SearchReplacePanel';
 
 function getApiKeyStatus() {
   if (getSessionApiKey()) return 'unlocked';
@@ -79,6 +80,7 @@ export default function EditorPage({ user }) {
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [blurIntensity, setBlurIntensity] = useState(10); //Adds State for wallpaper blur
   const [showDebugOverlay, setShowDebugOverlay] = useState(false);
+  const [showSearchReplace, setShowSearchReplace] = useState(false);
   const resizingRef = useRef(false);
 
   const isMobile = useIsMobile();
@@ -316,6 +318,11 @@ export default function EditorPage({ user }) {
     // Ctrl+Enter → Run
     editorInstance.addCommand(2048 | 3, () => {
       if (executionRunRef.current) executionRunRef.current();
+    });
+
+    // Ctrl+H → Toggle Search & Replace panel
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, () => {
+      setShowSearchReplace((v) => !v);
     });
 
     const formatCurrentModel = async () => {
@@ -1052,7 +1059,7 @@ export default function EditorPage({ user }) {
           <div
             id="editor-container"
             className={editor.minimapEnabled ? '' : 'minimap-disabled'}
-            style={{ flex: 1, minHeight: 0, opacity: room.isReadOnly ? 0.8 : 1 }}
+            style={{ flex: 1, minHeight: 0, opacity: room.isReadOnly ? 0.8 : 1, position: 'relative' }}
           >
             {room.isReadOnly && (
               <div className="readonly-badge">
@@ -1118,6 +1125,12 @@ export default function EditorPage({ user }) {
                 formatOnPaste: true,
               }}
             />
+            {showSearchReplace && (
+              <SearchReplacePanel
+                editorRef={editorRef}
+                onClose={() => setShowSearchReplace(false)}
+              />
+            )}
           </div>
 
           {/* Stdin Panel */}
