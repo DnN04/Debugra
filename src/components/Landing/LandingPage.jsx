@@ -689,6 +689,7 @@ export default function LandingPage() {
   </p>
 </footer>
 
+
       {/* ===== LOGIN MODAL ===== */}
       {showLogin && (
         <div className="modal-backdrop" onClick={() => setShowLogin(false)}>
