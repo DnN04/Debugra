@@ -410,17 +410,9 @@ export default function LandingPage() {
       {/* ===== NAVBAR ===== */}
       <nav className="landing-nav">
         <div className="landing-nav-left">
-          <img src="/icon-dark.svg" height="26" alt="Debugra Logo" />
+          <img src={theme === 'light' ? "/icon-light.svg" : "/icon-dark.svg"} height="26" alt="Debugra Logo" />
           <span className="landing-logo">Debugra</span>
-          <span
-            style={{
-              fontSize: '0.6rem',
-              color: '#888888',
-              fontFamily: 'JetBrains Mono, monospace',
-              marginLeft: '4px',
-              paddingBottom: '1px',
-            }}
-          >
+          <span className="landing-version-badge">
             v1.0
           </span>
         </div>
@@ -1041,8 +1033,8 @@ export default function LandingPage() {
       {/* ===== FOOTER ===== */}
 <footer className="landing-footer">
   <div className="d-flex align-items-center gap-2 justify-content-center mb-1">
-    <img src="/icon-dark.svg" height="14" alt="Debugra Logo" />
-    <span style={{ fontWeight: 600, color: '#e2e8f0' }}>Debugra</span>
+    <img src={theme === 'light' ? "/icon-light.svg" : "/icon-dark.svg"} height="14" alt="Debugra Logo" />
+    <span className="landing-footer-logo-text">Debugra</span>
   </div>
 
   <p style={{ margin: 0, fontSize: '0.72rem', color: '#4a4a6a' }}>
