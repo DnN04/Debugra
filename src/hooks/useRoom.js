@@ -265,6 +265,21 @@ export function useRoom({ user, code, language, stdinValue, setCode, setLanguage
     }
   }, [user, roomId, joinRoom]);
 
+  // ─── Presence cleanup on browser tab/window close ──────────────────────────
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (roomId && user && roomData) {
+        const currentUsers = roomData.activeUsers || [];
+        const newUsers = currentUsers.filter((u) => u.uid !== user.uid);
+        updateDoc(doc(db, 'rooms', roomId), { activeUsers: newUsers }).catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [roomId, user, roomData]);
+
   // (Legacy access control methods removed for simpler role system)
   const requestAccess = useCallback(() => {}, []);
   const approveAccess = useCallback(() => {}, []);
